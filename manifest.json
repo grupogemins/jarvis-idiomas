@@ -1,0 +1,9 @@
+{
+  "name": "Jarvis Idiomas",
+  "short_name": "Jarvis",
+  "description": "Tradutor e dicionario por voz - portugues, ingles, espanhol e coreano",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f7f7",
+  "theme_color": "#58cc02"
+}

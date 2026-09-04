@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Jarvis Idiomas</title>
+<meta name="description" content="Tradutor e dicionario por voz - portugues, ingles, espanhol e coreano">
+<meta name="theme-color" content="#58cc02">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --verde:#58cc02; --verde-esc:#4caf00; --azul:#1cb0f6; --amarelo:#ffc800;
+    --roxo:#ce82ff; --vermelho:#ff4b4b; --cinza-bg:#f7f7f7; --cinza-borda:#e5e5e5;
+    --texto:#3c3c3c; --texto-fraco:#777; --branco:#fff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--cinza-bg); color:var(--texto);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:16px 12px 40px; -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{width:100%; max-width:480px;}
+  header{display:flex; align-items:center; justify-content:center; gap:10px; margin:8px 0 20px;}
+  header .logo{font-size:34px;}
+  header h1{font-size:22px; margin:0; font-weight:800; color:var(--texto);}
+  header h1 span{color:var(--verde);}
+
+  .idiomas{display:flex; gap:8px; justify-content:center; margin-bottom:16px; flex-wrap:wrap;}
+  .pill{
+    border:2px solid var(--cinza-borda); background:var(--branco); border-radius:14px;
+    padding:8px 14px; font-size:14px; font-weight:700; cursor:pointer; color:var(--texto-fraco);
+    display:flex; align-items:center; gap:6px; transition:.15s;
+  }
+  .pill.ativo{border-color:var(--verde); color:var(--verde-esc); background:#eaffd6;}
+  .pill:active{transform:scale(.96);}
+
+  .direcao{
+    display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:18px;
+    background:var(--branco); border:2px solid var(--cinza-borda); border-radius:16px; padding:12px;
+  }
+  .direcao .lado{font-weight:800; font-size:15px; flex:1; text-align:center;}
+  .direcao .lado small{display:block; font-weight:500; color:var(--texto-fraco); font-size:11px; margin-top:2px;}
+  #btnSwap{
+    background:var(--cinza-bg); border:none; border-radius:50%; width:40px; height:40px;
+    font-size:18px; cursor:pointer; flex-shrink:0; transition:.15s;
+  }
+  #btnSwap:active{transform:rotate(180deg) scale(.9);}
+
+  .card{
+    background:var(--branco); border:2px solid var(--cinza-borda); border-radius:20px;
+    padding:24px 18px; text-align:center; margin-bottom:16px;
+  }
+  #micBtn{
+    width:110px; height:110px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--verde); color:#fff; font-size:42px; box-shadow:0 6px 0 var(--verde-esc);
+    transition:.08s; user-select:none; -webkit-user-select:none; touch-action:none;
+  }
+  #micBtn:active, #micBtn.ouvindo{transform:translateY(4px); box-shadow:0 2px 0 var(--verde-esc);}
+  #micBtn.ouvindo{background:var(--vermelho); box-shadow:0 6px 0 #c62828; animation:pulso 1s infinite;}
+  #micBtn:disabled{background:#ccc; box-shadow:0 6px 0 #aaa; cursor:not-allowed;}
+  @keyframes pulso{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+  #statusMic{margin-top:12px; font-size:13px; color:var(--texto-fraco); font-weight:600; min-height:18px;}
+  #avisoVoz{font-size:12px; color:var(--texto-fraco); margin-top:8px; line-height:1.4;}
+
+  .ou{text-align:center; color:var(--texto-fraco); font-size:12px; font-weight:700; margin:14px 0; text-transform:uppercase;}
+
+  .campo-texto{display:flex; gap:8px;}
+  .campo-texto input{
+    flex:1; border:2px solid var(--cinza-borda); border-radius:14px; padding:12px 14px;
+    font-size:15px; font-family:inherit; outline:none;
+  }
+  .campo-texto input:focus{border-color:var(--azul);}
+  .campo-texto button{
+    background:var(--azul); color:#fff; border:none; border-radius:14px; padding:0 18px;
+    font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 4px 0 #0f8dc4;
+  }
+  .campo-texto button:active{transform:translateY(3px); box-shadow:none;}
+
+  #resultado{display:none;}
+  #resultado.show{display:block;}
+  .resultado-card{
+    background:var(--branco); border:2px solid var(--verde); border-radius:20px; padding:18px;
+    margin-bottom:16px;
+  }
+  .resultado-origem{font-size:13px; color:var(--texto-fraco); font-weight:700; margin-bottom:4px;}
+  .resultado-traducao{font-size:22px; font-weight:800; color:var(--verde-esc); margin-bottom:10px;}
+  .resultado-ouvir{
+    background:var(--amarelo); border:none; border-radius:12px; padding:9px 16px; font-weight:800;
+    font-size:13px; cursor:pointer; box-shadow:0 3px 0 #cc9f00; color:#5a4200;
+  }
+  .resultado-ouvir:active{transform:translateY(2px); box-shadow:none;}
+  .erro{color:var(--vermelho); font-weight:700; font-size:14px; text-align:center; margin-bottom:16px;}
+
+  .historico-topo{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .historico-topo h2{font-size:15px; margin:0; color:var(--texto);}
+  .historico-topo .badge{background:#fff4d6; color:#8a6d00; font-weight:800; font-size:12px; padding:4px 10px; border-radius:10px;}
+  #limparHist{background:none; border:none; color:var(--texto-fraco); font-size:12px; cursor:pointer; text-decoration:underline;}
+  .hist-item{
+    background:var(--branco); border:1px solid var(--cinza-borda); border-radius:14px;
+    padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;
+  }
+  .hist-item .txt{font-size:14px;}
+  .hist-item .txt b{color:var(--verde-esc);}
+  .hist-item .hora{font-size:11px; color:var(--texto-fraco); flex-shrink:0;}
+  #vazio{text-align:center; color:var(--texto-fraco); font-size:13px; padding:16px 0;}
+
+  footer{text-align:center; font-size:11px; color:#aaa; margin-top:24px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🤖</div>
+    <h1>Jarvis <span>Idiomas</span></h1>
+  </header>
+
+  <div class="idiomas" id="idiomas"></div>
+
+  <div class="direcao">
+    <div class="lado" id="ladoOrigem"></div>
+    <button id="btnSwap" title="Trocar direcao">⇄</button>
+    <div class="lado" id="ladoDestino"></div>
+  </div>
+
+  <div class="card">
+    <button id="micBtn">🎤</button>
+    <div id="statusMic">segura e fala</div>
+    <div id="avisoVoz"></div>
+  </div>
+
+  <div class="ou">ou digite</div>
+
+  <div class="campo-texto">
+    <input id="campoInput" type="text" placeholder="Escreva aqui..." autocomplete="off">
+    <button id="btnEnviar">Traduzir</button>
+  </div>
+
+  <div id="erroBox"></div>
+
+  <div id="resultado">
+    <div class="resultado-card">
+      <div class="resultado-origem" id="resOrigem"></div>
+      <div class="resultado-traducao" id="resTraducao"></div>
+      <button class="resultado-ouvir" id="btnOuvirDeNovo">🔊 ouvir de novo</button>
+    </div>
+  </div>
+
+  <div class="historico-topo">
+    <h2>Seu historico</h2>
+    <div class="badge" id="badgeCount">0 palavras</div>
+  </div>
+  <div id="listaHistorico"></div>
+  <div id="vazio">Nada por aqui ainda. Fala ou digita algo pra comecar!</div>
+  <button id="limparHist" style="display:none;">limpar historico</button>
+
+  <footer>Jarvis Idiomas &middot; funciona no navegador, sem instalar nada</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var PT = { nome:"Portugues", bandeira:"🇧🇷", bcp47:"pt-BR", mm:"pt-BR" };
+  var IDIOMAS = {
+    en: { nome:"English",  bandeira:"🇬🇧", bcp47:"en-US", mm:"en" },
+    es: { nome:"Espanol",  bandeira:"🇪🇸", bcp47:"es-ES", mm:"es" },
+    ko: { nome:"한국어",    bandeira:"🇰🇷", bcp47:"ko-KR", mm:"ko" },
+  };
+  var ORDEM = ["en","es","ko"];
+
+  var LS_IDIOMA = "jarvis_idioma_alvo";
+  var LS_DIRECAO = "jarvis_direcao";
+  var LS_HIST = "jarvis_historico";
+
+  var idiomaAlvo = localStorage.getItem(LS_IDIOMA) || "en";
+  if (!IDIOMAS[idiomaAlvo]) idiomaAlvo = "en";
+  var direcao = localStorage.getItem(LS_DIRECAO) || "pt_para_alvo"; // ou "alvo_para_pt"
+  var historico = [];
+  try { historico = JSON.parse(localStorage.getItem(LS_HIST)) || []; } catch(e) { historico = []; }
+
+  var elIdiomas = document.getElementById("idiomas");
+  var elLadoOrigem = document.getElementById("ladoOrigem");
+  var elLadoDestino = document.getElementById("ladoDestino");
+  var elBtnSwap = document.getElementById("btnSwap");
+  var elMicBtn = document.getElementById("micBtn");
+  var elStatusMic = document.getElementById("statusMic");
+  var elAvisoVoz = document.getElementById("avisoVoz");
+  var elCampoInput = document.getElementById("campoInput");
+  var elBtnEnviar = document.getElementById("btnEnviar");
+  var elErroBox = document.getElementById("erroBox");
+  var elResultado = document.getElementById("resultado");
+  var elResOrigem = document.getElementById("resOrigem");
+  var elResTraducao = document.getElementById("resTraducao");
+  var elBtnOuvirDeNovo = document.getElementById("btnOuvirDeNovo");
+  var elBadgeCount = document.getElementById("badgeCount");
+  var elListaHistorico = document.getElementById("listaHistorico");
+  var elVazio = document.getElementById("vazio");
+  var elLimparHist = document.getElementById("limparHist");
+
+  var ultimaTraducao = null; // {texto, bcp47}
+
+  function origemAtual(){ return direcao === "pt_para_alvo" ? PT : IDIOMAS[idiomaAlvo]; }
+  function destinoAtual(){ return direcao === "pt_para_alvo" ? IDIOMAS[idiomaAlvo] : PT; }
+
+  function renderIdiomas(){
+    elIdiomas.innerHTML = "";
+    ORDEM.forEach(function(cod){
+      var i = IDIOMAS[cod];
+      var b = document.createElement("button");
+      b.className = "pill" + (cod === idiomaAlvo ? " ativo" : "");
+      b.innerHTML = i.bandeira + " " + i.nome;
+      b.onclick = function(){
+        idiomaAlvo = cod;
+        localStorage.setItem(LS_IDIOMA, cod);
+        renderTudo();
+      };
+      elIdiomas.appendChild(b);
+    });
+  }
+
+  function renderDirecao(){
+    var o = origemAtual(), d = destinoAtual();
+    elLadoOrigem.innerHTML = o.bandeira + " " + o.nome + "<small>voce fala isso</small>";
+    elLadoDestino.innerHTML = d.bandeira + " " + d.nome + "<small>ele traduz pra isso</small>";
+    var PLACEHOLDERS = {
+      "Portugues": "Escreva em portugues...",
+      "English": "Type here...",
+      "Espanol": "Escribe aqui...",
+      "한국어": "여기에 입력하세요...",
+    };
+    elCampoInput.placeholder = PLACEHOLDERS[o.nome] || "...";
+  }
+
+  function renderTudo(){
+    renderIdiomas();
+    renderDirecao();
+    esconderResultado();
+  }
+
+  elBtnSwap.onclick = function(){
+    direcao = direcao === "pt_para_alvo" ? "alvo_para_pt" : "pt_para_alvo";
+    localStorage.setItem(LS_DIRECAO, direcao);
+    renderDirecao();
+    esconderResultado();
+  };
+
+  // ---------------- Traducao ----------------
+
+  function traduzir(texto, mmOrigem, mmDestino){
+    var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(texto) +
+               "&langpair=" + encodeURIComponent(mmOrigem) + "|" + encodeURIComponent(mmDestino);
+    return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+      var t = d && d.responseData && d.responseData.translatedText;
+      if (!t) throw new Error("sem traducao");
+      return t;
+    });
+  }
+
+  // ---------------- Fala (TTS) ----------------
+
+  var vozesProntas = false;
+  if ("speechSynthesis" in window) {
+    speechSynthesis.onvoiceschanged = function(){ vozesProntas = true; };
+  }
+
+  function falar(texto, bcp47){
+    return new Promise(function(resolve){
+      if (!("speechSynthesis" in window) || !texto) return resolve();
+      try {
+        var u = new SpeechSynthesisUtterance(texto);
+        u.lang = bcp47;
+        var vozes = speechSynthesis.getVoices();
+        var alvo = null;
+        for (var i=0;i<vozes.length;i++){
+          if (vozes[i].lang === bcp47) { alvo = vozes[i]; break; }
+        }
+        if (!alvo){
+          var prefixo = bcp47.split("-")[0];
+          for (var j=0;j<vozes.length;j++){
+            if (vozes[j].lang.indexOf(prefixo) === 0) { alvo = vozes[j]; break; }
+          }
+        }
+        if (alvo) u.voice = alvo;
+        u.onend = resolve;
+        u.onerror = resolve;
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      } catch(e){ resolve(); }
+    });
+  }
+
+  // ---------------- Reconhecimento de voz (STT) ----------------
+
+  var SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recAtivo = null;
+
+  if (!SRClass) {
+    elAvisoVoz.textContent = "Ditado por voz nao e suportado neste navegador (comum no iPhone/Safari) -- use o campo de texto abaixo.";
+    elMicBtn.disabled = true;
+    elMicBtn.textContent = "🚫";
+  }
+
+  function iniciarEscuta(){
+    if (!SRClass || recAtivo) return;
+    var o = origemAtual();
+    try {
+      var rec = new SRClass();
+      recAtivo = rec;
+      rec.lang = o.bcp47;
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      var jaResolveu = false;
+
+      elMicBtn.classList.add("ouvindo");
+      elStatusMic.textContent = "ouvindo...";
+
+      rec.onresult = function(e){
+        jaResolveu = true;
+        var texto = e.results[0][0].transcript;
+        processarTermo(texto);
+      };
+      rec.onerror = function(e){
+        if (!jaResolveu) {
+          if (e.error === "no-speech") {
+            elStatusMic.textContent = "nao ouvi nada, tenta de novo";
+          } else if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+            mostrarErro("Preciso da permissao do microfone. Verifica nas configuracoes do navegador.");
+          } else {
+            elStatusMic.textContent = "erro no microfone (" + e.error + ")";
+          }
+        }
+      };
+      rec.onend = function(){
+        elMicBtn.classList.remove("ouvindo");
+        if (!jaResolveu) setTimeout(function(){ elStatusMic.textContent = "segura e fala"; }, 1500);
+        recAtivo = null;
+      };
+      rec.start();
+    } catch(e){
+      recAtivo = null;
+      elMicBtn.classList.remove("ouvindo");
+      elStatusMic.textContent = "nao consegui acessar o microfone";
+    }
+  }
+
+  function pararEscuta(){
+    if (recAtivo) { try { recAtivo.stop(); } catch(e){} }
+  }
+
+  elMicBtn.addEventListener("mousedown", iniciarEscuta);
+  elMicBtn.addEventListener("mouseup", pararEscuta);
+  elMicBtn.addEventListener("mouseleave", pararEscuta);
+  elMicBtn.addEventListener("touchstart", function(ev){ ev.preventDefault(); iniciarEscuta(); }, {passive:false});
+  elMicBtn.addEventListener("touchend", function(ev){ ev.preventDefault(); pararEscuta(); }, {passive:false});
+
+  // atalho de teclado "\" no PC (so quando a pagina esta em foco e o campo de texto nao esta sendo usado)
+  document.addEventListener("keydown", function(e){
+    if (e.key === "\\" && document.activeElement !== elCampoInput && !recAtivo) {
+      e.preventDefault();
+      iniciarEscuta();
+    }
+  });
+  document.addEventListener("keyup", function(e){
+    if (e.key === "\\") { pararEscuta(); }
+  });
+
+  // ---------------- Pipeline principal ----------------
+
+  function esconderResultado(){
+    elResultado.classList.remove("show");
+    elErroBox.innerHTML = "";
+  }
+
+  function mostrarErro(msg){
+    elErroBox.innerHTML = '<div class="erro">' + msg + '</div>';
+  }
+
+  function processarTermo(textoOriginal){
+    textoOriginal = (textoOriginal || "").trim();
+    if (!textoOriginal) return;
+    elErroBox.innerHTML = "";
+    elStatusMic.textContent = "traduzindo...";
+    var o = origemAtual(), d = destinoAtual();
+
+    traduzir(textoOriginal, o.mm, d.mm).then(function(traducao){
+      elStatusMic.textContent = "segura e fala";
+      elResOrigem.textContent = o.bandeira + " " + textoOriginal;
+      elResTraducao.textContent = traducao;
+      elResultado.classList.add("show");
+      ultimaTraducao = { texto: traducao, bcp47: d.bcp47 };
+      salvarHistorico(textoOriginal, traducao, o, d);
+      falar(traducao, d.bcp47);
+    }).catch(function(){
+      elStatusMic.textContent = "segura e fala";
+      mostrarErro("Deu erro na traducao. Verifica sua internet e tenta de novo.");
+    });
+  }
+
+  elBtnEnviar.onclick = function(){
+    processarTermo(elCampoInput.value);
+    elCampoInput.value = "";
+  };
+  elCampoInput.addEventListener("keydown", function(e){
+    if (e.key === "Enter") { elBtnEnviar.click(); }
+  });
+  elBtnOuvirDeNovo.onclick = function(){
+    if (ultimaTraducao) falar(ultimaTraducao.texto, ultimaTraducao.bcp47);
+  };
+
+  // ---------------- Historico ----------------
+
+  function salvarHistorico(original, traducao, origem, destino){
+    historico.unshift({
+      hora: new Date().toLocaleString("pt-BR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}),
+      original: original, traducao: traducao,
+      origem: origem.bandeira, destino: destino.bandeira,
+    });
+    if (historico.length > 100) historico = historico.slice(0, 100);
+    localStorage.setItem(LS_HIST, JSON.stringify(historico));
+    renderHistorico();
+  }
+
+  function renderHistorico(){
+    elBadgeCount.textContent = historico.length + (historico.length === 1 ? " palavra" : " palavras");
+    elVazio.style.display = historico.length ? "none" : "block";
+    elLimparHist.style.display = historico.length ? "inline-block" : "none";
+    elListaHistorico.innerHTML = "";
+    historico.forEach(function(h){
+      var div = document.createElement("div");
+      div.className = "hist-item";
+      div.innerHTML =
+        '<div class="txt">' + h.origem + ' ' + escapeHtml(h.original) +
+        ' &rarr; ' + h.destino + ' <b>' + escapeHtml(h.traducao) + '</b></div>' +
+        '<div class="hora">' + h.hora + '</div>';
+      elListaHistorico.appendChild(div);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  elLimparHist.onclick = function(){
+    if (confirm("Apagar todo o historico?")) {
+      historico = [];
+      localStorage.removeItem(LS_HIST);
+      renderHistorico();
+    }
+  };
+
+  // ---------------- Start ----------------
+
+  renderTudo();
+  renderHistorico();
+})();
+</script>
+</body>
+</html>
