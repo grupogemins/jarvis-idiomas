@@ -124,7 +124,7 @@
 
   <div class="direcao">
     <div class="lado" id="ladoOrigem"></div>
-    <button id="btnSwap" title="Trocar direcao">⇄</button>
+    <button id="btnSwap" title="Entendeu errado? Clica pra corrigir a direcao do ultimo resultado">⇄</button>
     <div class="lado" id="ladoDestino"></div>
   </div>
 
@@ -175,12 +175,10 @@
   var ORDEM = ["en","es","ko"];
 
   var LS_IDIOMA = "jarvis_idioma_alvo";
-  var LS_DIRECAO = "jarvis_direcao";
   var LS_HIST = "jarvis_historico";
 
   var idiomaAlvo = localStorage.getItem(LS_IDIOMA) || "en";
   if (!IDIOMAS[idiomaAlvo]) idiomaAlvo = "en";
-  var direcao = localStorage.getItem(LS_DIRECAO) || "pt_para_alvo"; // ou "alvo_para_pt"
   var historico = [];
   try { historico = JSON.parse(localStorage.getItem(LS_HIST)) || []; } catch(e) { historico = []; }
 
@@ -203,10 +201,9 @@
   var elVazio = document.getElementById("vazio");
   var elLimparHist = document.getElementById("limparHist");
 
-  var ultimaTraducao = null; // {texto, bcp47}
+  var ultimaTraducao = null; // {texto, bcp47, original, origem, destino}
 
-  function origemAtual(){ return direcao === "pt_para_alvo" ? PT : IDIOMAS[idiomaAlvo]; }
-  function destinoAtual(){ return direcao === "pt_para_alvo" ? IDIOMAS[idiomaAlvo] : PT; }
+  function porCodigo(cod){ return cod === "pt" ? PT : IDIOMAS[cod]; }
 
   function renderIdiomas(){
     elIdiomas.innerHTML = "";
@@ -224,17 +221,19 @@
     });
   }
 
+  // Estado neutro (antes de qualquer resultado): mostra os dois idiomas possiveis,
+  // sem exigir que o usuario escolha uma direcao -- a detecao e' automatica.
   function renderDirecao(){
-    var o = origemAtual(), d = destinoAtual();
-    elLadoOrigem.innerHTML = o.bandeira + " " + o.nome + "<small>voce fala isso</small>";
-    elLadoDestino.innerHTML = d.bandeira + " " + d.nome + "<small>ele traduz pra isso</small>";
-    var PLACEHOLDERS = {
-      "Portugues": "Escreva em portugues...",
-      "English": "Type here...",
-      "Espanol": "Escribe aqui...",
-      "한국어": "여기에 입력하세요...",
-    };
-    elCampoInput.placeholder = PLACEHOLDERS[o.nome] || "...";
+    var alvo = IDIOMAS[idiomaAlvo];
+    elLadoOrigem.innerHTML = PT.bandeira + " " + PT.nome + "<small>detecta sozinho</small>";
+    elLadoDestino.innerHTML = alvo.bandeira + " " + alvo.nome + "<small>nos dois sentidos</small>";
+    elCampoInput.placeholder = "Escreva em portugues ou " + alvo.nome + "...";
+  }
+
+  // Depois de um resultado real: mostra qual lado foi detectado como origem/destino
+  function renderDirecaoDetectada(o, d){
+    elLadoOrigem.innerHTML = o.bandeira + " " + o.nome + "<small>voce falou isso</small>";
+    elLadoDestino.innerHTML = d.bandeira + " " + d.nome + "<small>traduzido</small>";
   }
 
   function renderTudo(){
@@ -243,12 +242,48 @@
     esconderResultado();
   }
 
+  // O botao de swap agora serve pra CORRIGIR o ultimo resultado, caso a deteccao
+  // automatica tenha entendido a direcao errada (ex: confundiu um nome com portugues).
   elBtnSwap.onclick = function(){
-    direcao = direcao === "pt_para_alvo" ? "alvo_para_pt" : "pt_para_alvo";
-    localStorage.setItem(LS_DIRECAO, direcao);
-    renderDirecao();
-    esconderResultado();
+    if (!ultimaTraducao) return;
+    var direcaoOposta = (ultimaTraducao.origem === PT) ? idiomaAlvo : "pt";
+    processarTermo(ultimaTraducao.original, direcaoOposta);
   };
+
+  // ---------------- Deteccao automatica de idioma (texto) ----------------
+
+  var STOP = {
+    pt: ["que","nao","com","para","uma","isso","voce","esta","muito","como","onde",
+         "obrigado","obrigada","bom","dia","tarde","noite","favor","vai","chover",
+         "quero","hoje","amanha","ontem","sim","tudo","bem","mas","ele","ela","eles","voces"],
+    en: ["the","is","you","what","how","much","this","that","and","are","do","does",
+         "please","thank","thanks","hello","hi","good","today","tomorrow","yesterday",
+         "want","yes","fine","but","he","she","they","of","to","rain"],
+    es: ["que","como","donde","esta","muy","gracias","favor","hola","buenos","dias",
+         "voy","llover","quiero","hoy","manana","ayer","si","bien","pero","el","ella",
+         "ellos","por"],
+  };
+
+  function normaliza(s){
+    return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+
+  function pontuarComoIdioma(texto, codigo){
+    if (codigo === "ko") return /[가-힣]/.test(texto) ? 10 : -5;
+    var t = " " + normaliza(texto) + " ";
+    var pontos = 0;
+    (STOP[codigo] || []).forEach(function(p){ if (t.indexOf(" " + p + " ") >= 0) pontos += 2; });
+    if (codigo === "pt" && /[ãõç]/i.test(texto)) pontos += 3;
+    if (codigo === "es" && /[ñ¿¡]/i.test(texto)) pontos += 3;
+    if (texto.trim()) pontos += 1;
+    return pontos;
+  }
+
+  function detectarIdiomaTexto(texto){
+    var pPT = pontuarComoIdioma(texto, "pt");
+    var pAlvo = pontuarComoIdioma(texto, idiomaAlvo);
+    return pAlvo > pPT ? idiomaAlvo : "pt";
+  }
 
   // ---------------- Traducao ----------------
 
@@ -296,9 +331,14 @@
   }
 
   // ---------------- Reconhecimento de voz (STT) ----------------
+  // O navegador exige saber de antemao qual idioma escutar (diferente do Whisper
+  // local, que detecta sozinho). Pra simular deteccao automatica, escutamos com
+  // DOIS reconhecedores ao mesmo tempo (portugues + idioma ativo) e comparamos
+  // qual resultado parece mais plausivel na lingua que ele mesmo tentou ouvir.
 
   var SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recAtivo = null;
+  var recsAtivos = [];
+  var escutando = false;
 
   if (!SRClass) {
     elAvisoVoz.textContent = "Ditado por voz nao e suportado neste navegador (comum no iPhone/Safari) -- use o campo de texto abaixo.";
@@ -306,52 +346,67 @@
     elMicBtn.textContent = "🚫";
   }
 
+  function reconhecerUma(bcp47){
+    return new Promise(function(resolve){
+      try {
+        var rec = new SRClass();
+        rec.lang = bcp47;
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        var terminou = false;
+        rec.onresult = function(e){
+          terminou = true;
+          var r = e.results[0][0];
+          resolve({ texto: r.transcript, confianca: r.confidence || 0 });
+        };
+        rec.onerror = function(){ if (!terminou){ terminou = true; resolve(null); } };
+        rec.onend = function(){ if (!terminou){ terminou = true; resolve(null); } };
+        recsAtivos.push(rec);
+        rec.start();
+      } catch(e){ resolve(null); }
+    });
+  }
+
+  function escolherResultadoVoz(candPT, candAlvo, idiomaAlvoCode){
+    if (!candPT && !candAlvo) return null;
+    if (!candPT) return { texto: candAlvo.texto, direcao: idiomaAlvoCode };
+    if (!candAlvo) return { texto: candPT.texto, direcao: "pt" };
+    var pPT = pontuarComoIdioma(candPT.texto, "pt") + (candPT.confianca || 0) * 2;
+    var pAlvo = pontuarComoIdioma(candAlvo.texto, idiomaAlvoCode) + (candAlvo.confianca || 0) * 2;
+    return pAlvo > pPT ? { texto: candAlvo.texto, direcao: idiomaAlvoCode } : { texto: candPT.texto, direcao: "pt" };
+  }
+
   function iniciarEscuta(){
-    if (!SRClass || recAtivo) return;
-    var o = origemAtual();
-    try {
-      var rec = new SRClass();
-      recAtivo = rec;
-      rec.lang = o.bcp47;
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.maxAlternatives = 1;
-      var jaResolveu = false;
+    if (!SRClass || escutando) return;
+    escutando = true;
+    recsAtivos = [];
+    elMicBtn.classList.add("ouvindo");
+    elStatusMic.textContent = "ouvindo... (portugues + " + IDIOMAS[idiomaAlvo].nome + ")";
 
-      elMicBtn.classList.add("ouvindo");
-      elStatusMic.textContent = "ouvindo...";
-
-      rec.onresult = function(e){
-        jaResolveu = true;
-        var texto = e.results[0][0].transcript;
-        processarTermo(texto);
-      };
-      rec.onerror = function(e){
-        if (!jaResolveu) {
-          if (e.error === "no-speech") {
-            elStatusMic.textContent = "nao ouvi nada, tenta de novo";
-          } else if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-            mostrarErro("Preciso da permissao do microfone. Verifica nas configuracoes do navegador.");
-          } else {
-            elStatusMic.textContent = "erro no microfone (" + e.error + ")";
-          }
-        }
-      };
-      rec.onend = function(){
-        elMicBtn.classList.remove("ouvindo");
-        if (!jaResolveu) setTimeout(function(){ elStatusMic.textContent = "segura e fala"; }, 1500);
-        recAtivo = null;
-      };
-      rec.start();
-    } catch(e){
-      recAtivo = null;
+    Promise.all([
+      reconhecerUma(PT.bcp47),
+      reconhecerUma(IDIOMAS[idiomaAlvo].bcp47)
+    ]).then(function(resultados){
+      escutando = false;
+      elMicBtn.classList.remove("ouvindo");
+      var escolha = escolherResultadoVoz(resultados[0], resultados[1], idiomaAlvo);
+      if (!escolha || !escolha.texto || !escolha.texto.trim()) {
+        elStatusMic.textContent = "nao ouvi nada, tenta de novo";
+        setTimeout(function(){ elStatusMic.textContent = "segura e fala"; }, 1500);
+        return;
+      }
+      elStatusMic.textContent = "segura e fala";
+      processarTermo(escolha.texto, escolha.direcao);
+    }).catch(function(){
+      escutando = false;
       elMicBtn.classList.remove("ouvindo");
       elStatusMic.textContent = "nao consegui acessar o microfone";
-    }
+    });
   }
 
   function pararEscuta(){
-    if (recAtivo) { try { recAtivo.stop(); } catch(e){} }
+    recsAtivos.forEach(function(r){ try { r.stop(); } catch(e){} });
   }
 
   elMicBtn.addEventListener("mousedown", iniciarEscuta);
@@ -362,7 +417,7 @@
 
   // atalho de teclado "\" no PC (so quando a pagina esta em foco e o campo de texto nao esta sendo usado)
   document.addEventListener("keydown", function(e){
-    if (e.key === "\\" && document.activeElement !== elCampoInput && !recAtivo) {
+    if (e.key === "\\" && document.activeElement !== elCampoInput && !escutando) {
       e.preventDefault();
       iniciarEscuta();
     }
@@ -382,19 +437,25 @@
     elErroBox.innerHTML = '<div class="erro">' + msg + '</div>';
   }
 
-  function processarTermo(textoOriginal){
+  // codigoOrigem: "pt" ou o codigo do idioma alvo. Se omitido, detecta pelo
+  // proprio texto (usado no campo de digitar, onde nao ha dois reconhecedores).
+  function processarTermo(textoOriginal, codigoOrigem){
     textoOriginal = (textoOriginal || "").trim();
     if (!textoOriginal) return;
     elErroBox.innerHTML = "";
     elStatusMic.textContent = "traduzindo...";
-    var o = origemAtual(), d = destinoAtual();
+
+    if (!codigoOrigem) codigoOrigem = detectarIdiomaTexto(textoOriginal);
+    var codigoDestino = codigoOrigem === "pt" ? idiomaAlvo : "pt";
+    var o = porCodigo(codigoOrigem), d = porCodigo(codigoDestino);
 
     traduzir(textoOriginal, o.mm, d.mm).then(function(traducao){
       elStatusMic.textContent = "segura e fala";
+      renderDirecaoDetectada(o, d);
       elResOrigem.textContent = o.bandeira + " " + textoOriginal;
       elResTraducao.textContent = traducao;
       elResultado.classList.add("show");
-      ultimaTraducao = { texto: traducao, bcp47: d.bcp47 };
+      ultimaTraducao = { texto: traducao, bcp47: d.bcp47, original: textoOriginal, origem: o, destino: d };
       salvarHistorico(textoOriginal, traducao, o, d);
       falar(traducao, d.bcp47);
     }).catch(function(){
