@@ -255,13 +255,17 @@
   var STOP = {
     pt: ["que","nao","com","para","uma","isso","voce","esta","muito","como","onde",
          "obrigado","obrigada","bom","dia","tarde","noite","favor","vai","chover",
-         "quero","hoje","amanha","ontem","sim","tudo","bem","mas","ele","ela","eles","voces"],
+         "quero","hoje","amanha","ontem","sim","tudo","bem","mas","ele","ela","eles","voces",
+         "em","fala","falar","falo","diz","dizer","significa","ingles","espanhol","coreano",
+         "portugues","escreve","escrever","traduz","traduzir","isto","aqui","um","uma","os","as"],
     en: ["the","is","you","what","how","much","this","that","and","are","do","does",
          "please","thank","thanks","hello","hi","good","today","tomorrow","yesterday",
-         "want","yes","fine","but","he","she","they","of","to","rain"],
+         "want","yes","fine","but","he","she","they","of","to","rain","in","english",
+         "mean","means","say","speak","write"],
     es: ["que","como","donde","esta","muy","gracias","favor","hola","buenos","dias",
          "voy","llover","quiero","hoy","manana","ayer","si","bien","pero","el","ella",
-         "ellos","por"],
+         "ellos","por","en","habla","hablar","dice","decir","significa","espanol",
+         "escribe","escribir","traduce","traducir"],
   };
 
   function normaliza(s){
@@ -372,8 +376,15 @@
     if (!candPT && !candAlvo) return null;
     if (!candPT) return { texto: candAlvo.texto, direcao: idiomaAlvoCode };
     if (!candAlvo) return { texto: candPT.texto, direcao: "pt" };
-    var pPT = pontuarComoIdioma(candPT.texto, "pt") + (candPT.confianca || 0) * 2;
-    var pAlvo = pontuarComoIdioma(candAlvo.texto, idiomaAlvoCode) + (candAlvo.confianca || 0) * 2;
+    // o texto reconhecido manda -- o proprio reconhecedor "acerta" o idioma que ele
+    // entende bem, e erra feio (garbled) no idioma que nao e' o dele. A confianca que
+    // o Chrome retorna e' pouco confiavel, entao so desempata quando o texto empata.
+    var pPT = pontuarComoIdioma(candPT.texto, "pt");
+    var pAlvo = pontuarComoIdioma(candAlvo.texto, idiomaAlvoCode);
+    if (pPT === pAlvo) {
+      pPT += (candPT.confianca || 0) * 0.5;
+      pAlvo += (candAlvo.confianca || 0) * 0.5;
+    }
     return pAlvo > pPT ? { texto: candAlvo.texto, direcao: idiomaAlvoCode } : { texto: candPT.texto, direcao: "pt" };
   }
 
