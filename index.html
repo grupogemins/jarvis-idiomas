@@ -253,19 +253,46 @@
   // ---------------- Deteccao automatica de idioma (texto) ----------------
 
   var STOP = {
-    pt: ["que","nao","com","para","uma","isso","voce","esta","muito","como","onde",
-         "obrigado","obrigada","bom","dia","tarde","noite","favor","vai","chover",
-         "quero","hoje","amanha","ontem","sim","tudo","bem","mas","ele","ela","eles","voces",
-         "em","fala","falar","falo","diz","dizer","significa","ingles","espanhol","coreano",
-         "portugues","escreve","escrever","traduz","traduzir","isto","aqui","um","uma","os","as"],
-    en: ["the","is","you","what","how","much","this","that","and","are","do","does",
-         "please","thank","thanks","hello","hi","good","today","tomorrow","yesterday",
-         "want","yes","fine","but","he","she","they","of","to","rain","in","english",
-         "mean","means","say","speak","write"],
-    es: ["que","como","donde","esta","muy","gracias","favor","hola","buenos","dias",
-         "voy","llover","quiero","hoy","manana","ayer","si","bien","pero","el","ella",
-         "ellos","por","en","habla","hablar","dice","decir","significa","espanol",
-         "escribe","escribir","traduce","traducir"],
+    pt: ["eu","tu","ele","ela","nos","voces","eles","elas","me","te","se","lhe","meu","minha",
+         "teu","tua","seu","sua","nosso","nossa","sou","es","somos","sao","era","estava","estou",
+         "esta","estamos","estao","tenho","tem","temos","tinha","vou","vai","vamos","vao","foi",
+         "nao","sim","e","ou","mas","porque","entao","quando","onde","que","quem","qual","como",
+         "este","estes","estas","isso","isto","aqui","ali","la","tudo","algum","alguma","nenhum",
+         "cada","todo","toda","um","uma","os","as",
+         "em","no","na","nas","por","para","com","sem","sobre","entre","contra","ate","desde",
+         "apos","antes","depois","acima","abaixo","de","do","da","dos","das",
+         "preciso","quero","gosto","sei","penso","vejo","olho","pego","venho","faco","dou","digo",
+         "pergunto","trabalho","ajuda","favor","obrigado","obrigada","ola","oi","bom","ruim","bem","ok",
+         "muito","so","tambem","mais","menos","pouco","outro","outra","mesmo","mesma","proprio",
+         "hoje","amanha","ontem","agora","sempre","nunca","chover","vai",
+         "fala","falar","falo","diz","dizer","significa","ingles","espanhol","coreano",
+         "portugues","escreve","escrever","traduz","traduzir","desculpa"],
+    en: ["i","you","he","she","it","we","they","me","him","her","us","them","my","your","his",
+         "its","our","their","am","is","are","was","were","be","been","being","have","has","had",
+         "do","does","did","will","would","shall","should","can","could","may","might","must",
+         "not","no","yes","and","or","but","if","because","so","than","then","when","where","why",
+         "what","who","whom","which","how","this","that","these","those","here","there","all",
+         "some","any","each","every","none",
+         "in","on","at","by","for","with","about","against","between","into","through","during",
+         "before","after","above","below","to","from","up","down","of","off","over","under","again",
+         "need","want","like","know","think","see","look","get","go","come","make","take","give",
+         "tell","ask","work","help","please","thank","thanks","hello","hi","good","bad","fine","ok","okay",
+         "very","just","only","also","too","more","most","much","many","few","little","other",
+         "another","same","own","today","tomorrow","yesterday","now","always","never","often","sometimes",
+         "english","sorry","excuse","welcome"],
+    es: ["yo","tu","el","ella","nosotros","ellos","ellas","me","te","se","le","mi","su","nuestro",
+         "nuestra","soy","eres","es","somos","son","era","estaba","estoy","esta","estamos","estan",
+         "tengo","tiene","tenemos","tenia","voy","va","vamos","van","fue",
+         "no","si","y","o","pero","porque","entonces","cuando","donde","que","quien","cual","como",
+         "este","esta","estos","estas","aqui","alli","alla","todo","algun","alguna","ningun","cada",
+         "en","por","para","con","sin","sobre","entre","contra","hasta","desde","despues","antes",
+         "encima","debajo","de","del",
+         "necesito","quiero","gusta","se","pienso","veo","miro","tomo","vengo","hago","doy","digo",
+         "pregunto","trabajo","ayuda","favor","gracias","hola","bueno","malo","bien","ok",
+         "muy","solo","tambien","mas","menos","poco","otro","otra","mismo","misma",
+         "hoy","manana","ayer","ahora","siempre","nunca","llover",
+         "habla","hablar","dice","decir","significa","espanol","escribe","escribir","traduce","traducir",
+         "disculpa","perdon"],
   };
 
   function normaliza(s){
@@ -292,7 +319,11 @@
   function detectarIdiomaTexto(texto){
     var pPT = pontuarComoIdioma(texto, "pt");
     var pAlvo = pontuarComoIdioma(texto, idiomaAlvo);
-    return pAlvo > pPT ? idiomaAlvo : "pt";
+    // empate (ex: uma palavra estrangeira isolada, tipo "spring", sem nenhuma
+    // pista de idioma) favorece o idioma selecionado -- e' o uso mais comum
+    // (ouvir uma palavra estrangeira sozinha e' mais frequente que digitar
+    // uma frase inteira em portugues sem nenhuma palavra comum reconhecivel).
+    return pAlvo >= pPT ? idiomaAlvo : "pt";
   }
 
   // ---------------- Traducao ----------------
