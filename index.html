@@ -336,12 +336,17 @@
 
   // ---------------- Reconhecimento de voz (STT) ----------------
   // O navegador exige saber de antemao qual idioma escutar (diferente do Whisper
-  // local, que detecta sozinho). Pra simular deteccao automatica, escutamos com
-  // DOIS reconhecedores ao mesmo tempo (portugues + idioma ativo) e comparamos
-  // qual resultado parece mais plausivel na lingua que ele mesmo tentou ouvir.
+  // local, que detecta sozinho). Chegamos a testar escutar com DOIS reconhecedores
+  // ao mesmo tempo (portugues + idioma ativo) pra simular deteccao automatica, mas
+  // isso se mostrou instavel na pratica -- o Chrome nao lida bem com duas sessoes de
+  // reconhecimento simultaneas, e uma delas falha silenciosamente com frequencia.
+  // Por isso: UM SO reconhecedor, sempre no idioma ativo (o caso de uso principal
+  // -- ouvir uma palavra estrangeira e saber o significado). A direcao ainda e'
+  // detectada automaticamente pelo TEXTO reconhecido (mesmo heuristico do campo de
+  // digitar), entao "vai chover" continua funcionando por voz tambem.
 
   var SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recsAtivos = [];
+  var recAtivo = null;
   var escutando = false;
 
   if (!SRClass) {
@@ -350,74 +355,51 @@
     elMicBtn.textContent = "🚫";
   }
 
-  function reconhecerUma(bcp47){
-    return new Promise(function(resolve){
-      try {
-        var rec = new SRClass();
-        rec.lang = bcp47;
-        rec.continuous = false;
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-        var terminou = false;
-        rec.onresult = function(e){
-          terminou = true;
-          var r = e.results[0][0];
-          resolve({ texto: r.transcript, confianca: r.confidence || 0 });
-        };
-        rec.onerror = function(){ if (!terminou){ terminou = true; resolve(null); } };
-        rec.onend = function(){ if (!terminou){ terminou = true; resolve(null); } };
-        recsAtivos.push(rec);
-        rec.start();
-      } catch(e){ resolve(null); }
-    });
-  }
-
-  function escolherResultadoVoz(candPT, candAlvo, idiomaAlvoCode){
-    if (!candPT && !candAlvo) return null;
-    if (!candPT) return { texto: candAlvo.texto, direcao: idiomaAlvoCode };
-    if (!candAlvo) return { texto: candPT.texto, direcao: "pt" };
-    // o texto reconhecido manda -- o proprio reconhecedor "acerta" o idioma que ele
-    // entende bem, e erra feio (garbled) no idioma que nao e' o dele. A confianca que
-    // o Chrome retorna e' pouco confiavel, entao so desempata quando o texto empata.
-    var pPT = pontuarComoIdioma(candPT.texto, "pt");
-    var pAlvo = pontuarComoIdioma(candAlvo.texto, idiomaAlvoCode);
-    if (pPT === pAlvo) {
-      pPT += (candPT.confianca || 0) * 0.5;
-      pAlvo += (candAlvo.confianca || 0) * 0.5;
-    }
-    return pAlvo > pPT ? { texto: candAlvo.texto, direcao: idiomaAlvoCode } : { texto: candPT.texto, direcao: "pt" };
-  }
-
   function iniciarEscuta(){
     if (!SRClass || escutando) return;
     escutando = true;
-    recsAtivos = [];
     elMicBtn.classList.add("ouvindo");
-    elStatusMic.textContent = "ouvindo... (portugues + " + IDIOMAS[idiomaAlvo].nome + ")";
+    elStatusMic.textContent = "ouvindo...";
+    try {
+      var rec = new SRClass();
+      recAtivo = rec;
+      rec.lang = IDIOMAS[idiomaAlvo].bcp47;
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      var terminou = false;
 
-    Promise.all([
-      reconhecerUma(PT.bcp47),
-      reconhecerUma(IDIOMAS[idiomaAlvo].bcp47)
-    ]).then(function(resultados){
+      rec.onresult = function(e){
+        terminou = true;
+        processarTermo(e.results[0][0].transcript);
+      };
+      rec.onerror = function(e){
+        if (!terminou) {
+          terminou = true;
+          if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+            mostrarErro("Preciso da permissao do microfone. Verifica nas configuracoes do navegador.");
+          } else if (e.error !== "no-speech" && e.error !== "aborted") {
+            elStatusMic.textContent = "erro no microfone (" + e.error + ")";
+          }
+        }
+      };
+      rec.onend = function(){
+        escutando = false;
+        elMicBtn.classList.remove("ouvindo");
+        if (!terminou) setTimeout(function(){ elStatusMic.textContent = "segura e fala"; }, 1500);
+        recAtivo = null;
+      };
+      rec.start();
+    } catch(e){
       escutando = false;
-      elMicBtn.classList.remove("ouvindo");
-      var escolha = escolherResultadoVoz(resultados[0], resultados[1], idiomaAlvo);
-      if (!escolha || !escolha.texto || !escolha.texto.trim()) {
-        elStatusMic.textContent = "nao ouvi nada, tenta de novo";
-        setTimeout(function(){ elStatusMic.textContent = "segura e fala"; }, 1500);
-        return;
-      }
-      elStatusMic.textContent = "segura e fala";
-      processarTermo(escolha.texto, escolha.direcao);
-    }).catch(function(){
-      escutando = false;
+      recAtivo = null;
       elMicBtn.classList.remove("ouvindo");
       elStatusMic.textContent = "nao consegui acessar o microfone";
-    });
+    }
   }
 
   function pararEscuta(){
-    recsAtivos.forEach(function(r){ try { r.stop(); } catch(e){} });
+    if (recAtivo) { try { recAtivo.stop(); } catch(e){} }
   }
 
   elMicBtn.addEventListener("mousedown", iniciarEscuta);
