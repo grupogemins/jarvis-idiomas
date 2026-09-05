@@ -328,13 +328,34 @@
 
   // ---------------- Traducao ----------------
 
-  function traduzir(texto, mmOrigem, mmDestino){
+  // Google Translate (endpoint publico sem chave, o mesmo usado por baixo dos panos
+  // pelos projetos de traducao gratuita mais populares do GitHub) -- qualidade bem
+  // melhor que a alternativa gratuita testada antes (MyMemory), que fica de reserva
+  // caso esse endpoint falhe ou fique indisponivel.
+  function traduzirGoogle(texto, origem, destino){
+    var sl = (origem || "").split("-")[0];
+    var tl = (destino || "").split("-")[0];
+    var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + sl +
+               "&tl=" + tl + "&dt=t&q=" + encodeURIComponent(texto);
+    return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+      if (!d || !d[0] || !d[0].length) throw new Error("resposta vazia do Google");
+      return d[0].map(function(seg){ return seg[0]; }).join("");
+    });
+  }
+
+  function traduzirMyMemory(texto, mmOrigem, mmDestino){
     var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(texto) +
                "&langpair=" + encodeURIComponent(mmOrigem) + "|" + encodeURIComponent(mmDestino);
     return fetch(url).then(function(r){ return r.json(); }).then(function(d){
       var t = d && d.responseData && d.responseData.translatedText;
       if (!t) throw new Error("sem traducao");
       return t;
+    });
+  }
+
+  function traduzir(texto, mmOrigem, mmDestino){
+    return traduzirGoogle(texto, mmOrigem, mmDestino).catch(function(){
+      return traduzirMyMemory(texto, mmOrigem, mmDestino);
     });
   }
 
