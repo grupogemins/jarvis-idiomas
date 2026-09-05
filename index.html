@@ -272,9 +272,15 @@
     return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   }
 
+  // tira pontuacao (ponto, virgula, "?", "!"...) antes de comparar palavra por
+  // palavra -- senao "please." nunca bate com "please" da lista de palavras-chave.
+  function limparPontuacao(s){
+    return s.replace(/[^\p{L}\p{N}\s]/gu, " ");
+  }
+
   function pontuarComoIdioma(texto, codigo){
     if (codigo === "ko") return /[가-힣]/.test(texto) ? 10 : -5;
-    var t = " " + normaliza(texto) + " ";
+    var t = " " + limparPontuacao(normaliza(texto)) + " ";
     var pontos = 0;
     (STOP[codigo] || []).forEach(function(p){ if (t.indexOf(" " + p + " ") >= 0) pontos += 2; });
     if (codigo === "pt" && /[ãõç]/i.test(texto)) pontos += 3;
